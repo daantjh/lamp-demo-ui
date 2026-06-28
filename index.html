@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Verlichting demo</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  :root {
+    --bg: #1c2230;
+    --card: #252c3d;
+    --accent: #44546A;
+    --accent-light: #9AA8BF;
+    --text: #E2E2E2;
+    --muted: #8b95a8;
+    --ok: #3ec46d;
+    --bad: #d9534f;
+    --track: #34465B;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  #status-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; padding: 6px 12px; border-radius: 20px;
+    background: var(--card); color: var(--muted);
+  }
+  #status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--bad); transition: background .3s;
+  }
+  #status-pill.connected #status-dot { background: var(--ok); }
+  #status-pill.connected { color: var(--text); }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .slider-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .slider-name { font-size: 16px; font-weight: 600; }
+  .slider-name.small { font-size: 14px; color: var(--accent-light); }
+  .slider-val {
+    font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--accent-light);
+  }
+  .slider-val .pct { font-size: 14px; color: var(--muted); margin-left: 2px; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 38px; background: transparent; margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 10px; border-radius: 6px; background: var(--track);
+  }
+  input[type=range]::-moz-range-track {
+    height: 10px; border-radius: 6px; background: var(--track);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-light); border: 3px solid var(--bg);
+    margin-top: -10px; cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent-light); border: 3px solid var(--bg); cursor: pointer;
+  }
+  .all-card input[type=range]::-webkit-slider-thumb { background: #fff; }
+  .all-card input[type=range]::-moz-range-thumb { background: #fff; }
+
+  .buttons { display: flex; gap: 12px; }
+  button {
+    flex: 1; padding: 16px; font-size: 16px; font-weight: 600;
+    border: none; border-radius: 12px; cursor: pointer;
+    background: var(--accent); color: #fff; transition: filter .15s, transform .05s;
+  }
+  button:active { transform: scale(.97); filter: brightness(1.2); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .log-card { font-size: 13px; }
+  .log-card h2 { font-size: 13px; color: var(--muted); margin: 0 0 8px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  #log {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 12px; color: var(--accent-light);
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 140px; overflow-y: auto; line-height: 1.5;
+  }
+  #log .out { color: var(--accent-light); }
+  #log .in  { color: var(--ok); }
+  #log .sys { color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Verlichting demo</h1>
+    <span id="status-pill"><span id="status-dot"></span><span id="status-text">Verbinden…</span></span>
+  </header>
+
+  <!-- Per-lamp sliders -->
+  <div class="card" data-lamp>
+    <div class="slider-head">
+      <span class="slider-name">Host</span>
+      <span class="slider-val"><span id="host-val">0</span><span class="pct">%</span></span>
+    </div>
+    <input type="range" id="host" min="0" max="100" value="0" data-cmd="host" data-out="host-val" />
+  </div>
+
+  <div class="card" data-lamp>
+    <div class="slider-head">
+      <span class="slider-name">Sub 1</span>
+      <span class="slider-val"><span id="sub1-val">0</span><span class="pct">%</span></span>
+    </div>
+    <input type="range" id="sub1" min="0" max="100" value="0" data-cmd="sub1" data-out="sub1-val" />
+  </div>
+
+  <div class="card" data-lamp>
+    <div class="slider-head">
+      <span class="slider-name">Sub 2</span>
+      <span class="slider-val"><span id="sub2-val">0</span><span class="pct">%</span></span>
+    </div>
+    <input type="range" id="sub2" min="0" max="100" value="0" data-cmd="sub2" data-out="sub2-val" />
+  </div>
+
+  <!-- All -->
+  <div class="card all-card">
+    <div class="slider-head">
+      <span class="slider-name small">Alle lampen</span>
+      <span class="slider-val"><span id="all-val">0</span><span class="pct">%</span></span>
+    </div>
+    <input type="range" id="all" min="0" max="100" value="0" />
+  </div>
+
+  <!-- Buttons -->
+  <div class="card buttons">
+    <button id="sync-btn">Sync</button>
+    <button id="status-btn">Status</button>
+  </div>
+
+  <!-- Log -->
+  <div class="card log-card">
+    <h2>Berichten</h2>
+    <div id="log"></div>
+  </div>
+
+<script>
+  // ---- Configuratie (matcht de firmware) ----
+  const BROKER_URL = "wss://broker.hivemq.com:8884/mqtt"; // beveiligde WebSocket; ws://broker.hivemq.com:8000/mqtt werkt ook maar wordt vaker geblokkeerd
+  const CMD_TOPIC  = "devacademy/naar_nrf54_cmd/topic";  // hier publishen we commando's
+  const PUB_TOPIC  = "devacademy/vanafnrf54_pub/topic";  // hier subscriben we voor status-antwoorden
+  const CLIENT_ID  = "demo_ui_" + Math.random().toString(16).slice(2, 10);
+
+  // ---- DOM ----
+  const pill = document.getElementById("status-pill");
+  const statusText = document.getElementById("status-text");
+  const logEl = document.getElementById("log");
+
+  function log(msg, cls = "sys") {
+    const time = new Date().toLocaleTimeString("nl-NL", { hour12: false });
+    const line = document.createElement("div");
+    line.className = cls;
+    line.textContent = `${time}  ${msg}`;
+    logEl.prepend(line);
+    while (logEl.childElementCount > 40) logEl.lastChild.remove();
+  }
+
+  function setConnected(on) {
+    pill.classList.toggle("connected", on);
+    statusText.textContent = on ? "Verbonden" : "Niet verbonden";
+    document.querySelectorAll("button").forEach(b => b.disabled = !on);
+  }
+
+  // ---- MQTT ----
+  setConnected(false);
+  log("Verbinden met " + BROKER_URL);
+  const client = mqtt.connect(BROKER_URL, {
+    clientId: CLIENT_ID,
+    clean: true,
+    reconnectPeriod: 2000,
+  });
+
+  client.on("connect", () => {
+    setConnected(true);
+    log("Verbonden (" + CLIENT_ID + ")");
+    client.subscribe(PUB_TOPIC, (err) => {
+      if (!err) log("Geabonneerd op status-topic");
+    });
+  });
+  client.on("reconnect", () => { setConnected(false); statusText.textContent = "Opnieuw verbinden…"; });
+  client.on("close",     () => setConnected(false));
+  client.on("error",     (e) => log("Fout: " + e.message, "sys"));
+  client.on("message", (topic, payload) => {
+    log("◄ " + payload.toString(), "in");
+  });
+
+  function publish(cmd) {
+    if (!client.connected) { log("Niet verbonden, '" + cmd + "' niet verstuurd"); return; }
+    client.publish(CMD_TOPIC, cmd, { qos: 0 });
+    log("► " + cmd, "out");
+  }
+
+  // ---- Sliders: waarde live tonen (input), pas versturen bij loslaten (change) ----
+  document.querySelectorAll("input[type=range][data-cmd]").forEach(slider => {
+    const out = document.getElementById(slider.dataset.out);
+    slider.addEventListener("input",  () => { out.textContent = slider.value; });
+    slider.addEventListener("change", () => { publish(slider.dataset.cmd + "=" + slider.value); });
+  });
+
+  // ---- All-slider: stuurt all= en zet de drie losse sliders mee ----
+  const allSlider = document.getElementById("all");
+  const allOut = document.getElementById("all-val");
+  function setSlider(id, v) {
+    const s = document.getElementById(id);
+    s.value = v;
+    document.getElementById(s.dataset.out).textContent = v;
+  }
+  allSlider.addEventListener("input", () => {
+    allOut.textContent = allSlider.value;
+    setSlider("host", allSlider.value);
+    setSlider("sub1", allSlider.value);
+    setSlider("sub2", allSlider.value);
+  });
+  allSlider.addEventListener("change", () => { publish("all=" + allSlider.value); });
+
+  // ---- Knoppen ----
+  document.getElementById("sync-btn").addEventListener("click", () => {
+    publish("sync");
+    // host-waarde lokaal overnemen in de UI (firmware zet subs = host)
+    const h = document.getElementById("host").value;
+    setSlider("sub1", h); setSlider("sub2", h);
+  });
+  document.getElementById("status-btn").addEventListener("click", () => publish("status"));
+</script>
+</body>
+</html>
