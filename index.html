@@ -118,14 +118,6 @@
   <!-- Per-lamp sliders -->
   <div class="card" data-lamp>
     <div class="slider-head">
-      <span class="slider-name">Host</span>
-      <span class="slider-val"><span id="host-val">0</span><span class="pct">%</span></span>
-    </div>
-    <input type="range" id="host" min="0" max="100" value="0" data-cmd="host" data-out="host-val" />
-  </div>
-
-  <div class="card" data-lamp>
-    <div class="slider-head">
       <span class="slider-name">Sub 1</span>
       <span class="slider-val"><span id="sub1-val">0</span><span class="pct">%</span></span>
     </div>
@@ -138,6 +130,14 @@
       <span class="slider-val"><span id="sub2-val">0</span><span class="pct">%</span></span>
     </div>
     <input type="range" id="sub2" min="0" max="100" value="0" data-cmd="sub2" data-out="sub2-val" />
+  </div>
+
+  <div class="card" data-lamp>
+    <div class="slider-head">
+      <span class="slider-name">Host</span>
+      <span class="slider-val"><span id="host-val">0</span><span class="pct">%</span></span>
+    </div>
+    <input type="range" id="host" min="0" max="100" value="0" data-cmd="host" data-out="host-val" />
   </div>
 
   <!-- All -->
@@ -246,6 +246,9 @@
     // host-waarde lokaal overnemen in de UI (firmware zet subs = host)
     const h = document.getElementById("host").value;
     setSlider("sub1", h); setSlider("sub2", h);
+    // ook de All-slider meetrekken zodat alle vier synchroon staan
+    allSlider.value = h;
+    allOut.textContent = h;
   });
   document.getElementById("status-btn").addEventListener("click", () => publish("status"));
 </script>
